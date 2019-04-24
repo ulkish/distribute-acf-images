@@ -18,7 +18,7 @@ add_action( 'dt_push_post', 'distribute_acf_image', 10, 4 );
 add_action( 'dt_pull_post', 'pull_acf_image', 10, 3 );
 add_action( 'dt_push_post_media', 'set_acf_media', 10, 6 );
 add_action( 'dt_pull_post_media', 'pull_acf_media', 10, 6 );
-add_action( 'dt_push_post', 'update_link_types', 10, 4 );
+
 
 function distribute_acf_image( $new_post_id, $original_post_id, $args, $site ) {
 
@@ -114,7 +114,7 @@ function set_acf_media ($boolean, $new_post_id, $media, $post_id, $args, $site){
 	$fields = get_fields($post_id);
 
 	if ($fields) {
-		foreach( $fields as $key => $value ):
+		foreach( $fields as $key => $value ) {
 
 			$field_object = get_field_object( $key, $post_id);
 
@@ -145,8 +145,7 @@ function set_acf_media ($boolean, $new_post_id, $media, $post_id, $args, $site){
 				$media[] = $acf_image;
 
 			}
-
-		endforeach;
+		}
 	}
 
 	$media = array_merge($media, $media_acf);
@@ -168,14 +167,20 @@ function pull_acf_media( $boolean, $new_post_id, $media, $original_post_id, $pos
 
 function get_image_id($image_url) {
 	global $wpdb;
-	$attachment = $wpdb->get_col($wpdb->prepare("SELECT ID FROM $wpdb->posts WHERE guid='%s';", $image_url ));
+
+	$attachment = $wpdb->get_col($wpdb->prepare("
+		SELECT ID FROM $wpdb->posts
+		WHERE guid='%s';",
+		$image_url ));
+
 	if($attachment){
 		return $attachment[0];
 	}
 }
 
 
-//Page Builder image search
+// Page Builder image search
+// Rewrite function name
 function array_loop($post_id, $array){
 	global $wpdb;
 
@@ -186,7 +191,8 @@ function array_loop($post_id, $array){
 		$dt_original_fields = $wpdb->get_results($wpdb->prepare("
 			SELECT meta_key
 			FROM $wpdb->postmeta as pm1
-			WHERE pm1.meta_key in (SELECT SUBSTRING(pm2.meta_key, 2) FROM $wpdb->postmeta as pm2
+			WHERE pm1.meta_key in (SELECT SUBSTRING(pm2.meta_key, 2)
+			FROM $wpdb->postmeta as pm2
 			WHERE  pm2.post_id = %d
 			AND pm2.meta_value = '%s')
 			AND pm1.post_id = %d",
@@ -208,41 +214,44 @@ function array_loop($post_id, $array){
 		$image_id = get_post_meta( $new_post_id, $field_name );
 
 
-				$original_media_id = $image_id[0];
+		$original_media_id = $image_id[0];
 
-				$meta_key = 'dt_original_media_id';
-				if ($original_media_id>=1){
-					$dt_id = $wpdb->get_col($wpdb->prepare("
-						SELECT post_id FROM $wpdb->postmeta
-						WHERE meta_key ='%s'
-						AND meta_value = %d
-						ORDER BY meta_id DESC LIMIT 1;",
-						$meta_key, $original_media_id));
+		$meta_key = 'dt_original_media_id';
+		if ($original_media_id>=1){
+			$args = array(
+					'post_type'      => 'attachment',
+					'post_status'    => 'inherit',
+					'order'          => 'DESC',
+					'posts_per_page' => 1,
+					'meta_query'     => array(
+						array(
+							'key'     => $meta_key,
+							'value'   => $original_media_id,
+							'compare' => '=',
+						)
+					)
+				);
+			$query = new WP_Query($args);
+			$acf_image_id = $query->posts[0]->ID;
 
-					$acf_image_id = $dt_id[0];
+			if ($acf_image_id && get_post( $acf_image_id ) ) {
 
-					if ($acf_image_id && get_post( $acf_image_id ) ) {
+				if ( wp_get_attachment_image( $acf_image_id, 'thumbnail' ) ) {
 
-						if ( wp_get_attachment_image( $acf_image_id, 'thumbnail' ) ) {
-							$wpdb->query( $wpdb->prepare( "
-							UPDATE $table_name  SET meta_value = %d
-							WHERE meta_value = %d
-							AND meta_key = '%s'
-							AND post_id = %d",
-							$acf_image_id, $original_media_id, $field_name, $new_post_id ));
-
-
-						} else {
-
-						}
-					}
+					update_post_meta( $new_post_id, $field_name, $acf_image_id, $original_media_id );
+				} else {
+					// Do something.
 				}
+			}
+		}
 
 	}
 }
 
 
 $acf_dt_media = array();
+
+// Rewrite this function name
 function array_loop2($array, $post_id, $deep=FALSE){
 	global $wpdb, $acf_dt_media;
 
@@ -260,20 +269,16 @@ function array_loop2($array, $post_id, $deep=FALSE){
 			}
 			if ($field_name!=''){
 				$destination_site_url = parse_url($field_name); // destination
-				$src_site_url = parse_url(get_site_url()); // main
+				$src_site_url         = parse_url(get_site_url()); // main
 
-				$field_name = str_replace($destination_site_url['host'], $src_site_url['host'], $field_name);
+				$field_name           = str_replace($destination_site_url['host'], $src_site_url['host'], $field_name);
 			}
 
-			$image_id = get_image_id($field_name);
-
-			$acf_image = \Distributor\Utils\format_media_post( get_post( $image_id ) );
-			$featured_image_id = get_post_thumbnail_id( $post_id );
-
+			$image_id              = get_image_id($field_name);
+			$acf_image             = \Distributor\Utils\format_media_post( get_post( $image_id ) );
+			$featured_image_id     = get_post_thumbnail_id( $post_id );
 			$acf_image['featured'] = ($featured_image_id == $image_id) ? true : false;
-
-
-			$acf_dt_media[] = $acf_image;
+			$acf_dt_media[]        = $acf_image;
 
 		}
 
@@ -299,45 +304,4 @@ function unique_multidim_array($array, $key) {
 		$i++;
 	}
 	return $temp_array;
-}
-
-
-
-
-//Page Builder Page link
-
-function update_link_types ($new_post_id, $original_post_id, $args, $site){
-
-	$destination_blog_id = (is_numeric($site)) ? $site : $site->site->blog_id;
-
-	// Switch to origin to get id
-	restore_current_blog();
-	$origin_blog_id = get_current_blog_id();
-	$origin_blog_id = ($origin_blog_id===$destination_blog_id) ? $args->site->blog_id : $origin_blog_id;
-	// Go back
-	switch_to_blog( $destination_blog_id );
-
-	$meta = get_post_meta($new_post_id);
-	foreach ($meta as $key => $value) {
-
-		if(strrpos($key, 'link_type')){
-
-			if ($value[0]=='page') {
-
-				$page_link = str_replace('link_type', 'page_link', $key);
-				update_post_meta($new_post_id, $key, 'custom');
-				$ob_id = get_post_meta($new_post_id, $page_link, true);
-				delete_post_meta($new_post_id, $page_link);
-				switch_to_blog( $origin_blog_id );
-				$post_destination_link = get_permalink($ob_id);
-				switch_to_blog( $destination_blog_id );
-
-				$custom_link = str_replace('link_type', 'custom_link', $key);
-
-				update_post_meta($new_post_id, $custom_link, $post_destination_link);
-			}
-
-		}
-	}
-
 }
