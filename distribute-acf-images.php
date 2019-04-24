@@ -14,294 +14,310 @@ if ( ! defined( 'ABSPATH' ) ) {
 	die( 'Invalid request.' );
 }
 
-add_action( 'dt_push_post', 'distribute_acf_image', 10, 4 );
-add_action( 'dt_pull_post', 'pull_acf_image', 10, 3 );
-add_action( 'dt_push_post_media', 'set_acf_media', 10, 6 );
-add_action( 'dt_pull_post_media', 'pull_acf_media', 10, 6 );
+// Check if class already exists
+if( ! class_exists('Distribute_ACF_Images') ) :
 
 
-function distribute_acf_image( $new_post_id, $original_post_id, $args, $site ) {
+class Distribute_ACF_Images {
 
-	$destination_blog_id = (is_numeric($site)) ? $site : $site->site->blog_id;
+	var $acf_dt_media = array();
 
-	// Switch to origin to get id
-	restore_current_blog();
-	$origin_blog_id = get_current_blog_id();
-	$origin_blog_id = ($origin_blog_id===$destination_blog_id) ? $args->site->blog_id : $origin_blog_id;
+	function __construct() {
+		add_action( 'dt_push_post', array( $this, 'distribute_acf_image'), 10, 4 );
+		add_action( 'dt_pull_post', array( $this, 'pull_acf_image'), 10, 3 );
+		add_action( 'dt_push_post_media', array( $this, 'set_acf_media'), 10, 6 );
+		add_action( 'dt_pull_post_media', array( $this, 'pull_acf_media'), 10, 6 );
+	}
 
-	// Go back
-	switch_to_blog( $destination_blog_id );
 
-	$post = get_post( $new_post_id );
-	$fields = get_fields($post->ID );
 
-	if ($fields) {
+	function distribute_acf_image( $new_post_id, $original_post_id, $args, $site ) {
 
-		foreach( $fields as $key => $value ) {
+		$destination_blog_id = (is_numeric($site)) ? $site : $site->site->blog_id;
 
-			$field_object = get_field_object( $key, $post->ID );
+		// Switch to origin to get id
+		restore_current_blog();
+		$origin_blog_id = get_current_blog_id();
+		$origin_blog_id = ($origin_blog_id===$destination_blog_id) ? $args->site->blog_id : $origin_blog_id;
 
-			foreach ($field_object as $key => $value) {
+		// Go back
+		switch_to_blog( $destination_blog_id );
 
-				if ($key=='type' && $value=='image'){
+		$post = get_post( $new_post_id );
+		$fields = get_fields($post->ID );
 
-				} elseif (acf_is_array($value)) {
+		if ($fields) {
 
-				   $field_name2 = array_loop($post->ID, $value);
+			foreach( $fields as $key => $value ) {
+
+				$field_object = get_field_object( $key, $post->ID );
+
+				foreach ($field_object as $key => $value) {
+
+					if ($key=='type' && $value=='image'){
+
+					} elseif (acf_is_array($value)) {
+
+					   $field_name2 = $this->array_loop($post->ID, $value);
+					}
+				}
+
+				if( $field_object['type'] == 'image' ) {
+
+					$field_name = ($field_object['_name']!='') ? $field_object['_name'] : $field_name2;
+					$image_id = get_post_meta( $new_post_id, $field_name );
+					$original_media_id = $image_id[0];
+
+					$meta_key = 'dt_original_media_id';
+					$args = array(
+						'post_type'      => 'attachment',
+						'post_status'    => 'inherit',
+						'order'          => 'DESC',
+						'posts_per_page' => 1,
+						'meta_query'     => array(
+							array(
+								'key'     => $meta_key,
+								'value'   => $original_media_id,
+								'compare' => '=',
+							)
+						)
+					);
+					$query = new WP_Query($args);
+					$acf_image_id = $query->posts[0]->ID;
+
+					if ($acf_image_id && get_post( $acf_image_id ) ) {
+
+						if ( wp_get_attachment_image( $acf_image_id, 'thumbnail' ) ) {
+							update_post_meta( $new_post_id, $field_name, $acf_image_id, $original_media_id );
+						} else { }
+					}
 				}
 			}
+		}
+		echo ' Main function ran. ';
+		return false;
+	}
 
-			if( $field_object['type'] == 'image' ) {
 
-				$field_name = ($field_object['_name']!='') ? $field_object['_name'] : $field_name2;
-				$image_id = get_post_meta( $new_post_id, $field_name );
-				$original_media_id = $image_id[0];
 
-				$meta_key = 'dt_original_media_id';
+	function pull_acf_image( $new_post_id, $args, $post_array ) {
+
+		$destination_blog_id = get_current_blog_id();
+
+		$this->distribute_acf_image( $new_post_id, $original_post_id, $args, $destination_blog_id );
+
+	}
+
+
+	function set_acf_media ($boolean, $new_post_id, $media, $post_id, $args, $site){
+
+		$destination_blog_id = (is_numeric($site)) ? $site : $site->site->blog_id;
+
+		// Switch to origin to get id
+		restore_current_blog();
+		$origin_blog_id = get_current_blog_id();
+		$origin_blog_id = ($origin_blog_id===$destination_blog_id) ? $args->site->blog_id : $origin_blog_id;
+
+		switch_to_blog( $origin_blog_id );
+
+		$media = \Distributor\Utils\prepare_media( $post_id );
+
+
+		$fields = get_fields($post_id);
+
+		if ($fields) {
+			foreach( $fields as $key => $value ) {
+
+				$field_object = get_field_object( $key, $post_id);
+
+				foreach ($field_object as $key => $value) {
+					if (acf_is_array($value)) {
+						$media_acf = $this->array_loop2($value, $post_id);
+					}
+				}
+
+				if( $field_object['type'] == 'image' || $field_object['media_type'] == 'image' ) {
+
+					$field_name = $field_object['value'];
+					if( $field_object['media_type'] == 'image' ) {
+						$field_name = $field_object['source_url'];
+					}
+					if ($field_name!=''){
+						$destination_site_url = parse_url($field_name); // destination
+						$src_site_url = parse_url(get_site_url()); // main
+
+						$field_name = str_replace($destination_site_url['host'], $src_site_url['host'], $field_name);
+					}
+					$image_id = $this->get_image_id($field_name);
+
+					$acf_image = \Distributor\Utils\format_media_post( get_post( $image_id ) );
+					$featured_image_id = get_post_thumbnail_id( $post_id );
+
+					$acf_image['featured'] = ($featured_image_id == $image_id) ? true : false;
+					$media[] = $acf_image;
+
+				}
+			}
+		}
+
+		$media = array_merge($media, $media_acf);
+		$media = $this->unique_multidim_array($media,'id');
+
+		// Go back
+		switch_to_blog( $destination_blog_id );
+
+		\Distributor\Utils\set_media( $new_post_id, $media );
+	}
+
+
+	function pull_acf_media( $boolean, $new_post_id, $media, $original_post_id, $post_array, $site ) {
+
+		$destination_blog_id = get_current_blog_id();
+
+		$this->set_acf_media( $boolean, $new_post_id, $media, $original_post_id, $site, $destination_blog_id );
+	}
+
+	function get_image_id($image_url) {
+		global $wpdb;
+
+		$attachment = $wpdb->get_col($wpdb->prepare("
+			SELECT ID FROM $wpdb->posts
+			WHERE guid='%s';",
+			$image_url ));
+
+		if($attachment){
+			return $attachment[0];
+		}
+	}
+
+
+	// Page Builder image search
+	// Rewrite function name
+	function array_loop($post_id, $array){
+		global $wpdb;
+
+		foreach ($array as $key => $value) {
+
+			if ($key=='type' && $value=='image'){
+
+			$dt_original_fields = $wpdb->get_results($wpdb->prepare("
+				SELECT meta_key
+				FROM $wpdb->postmeta as pm1
+				WHERE pm1.meta_key in (SELECT SUBSTRING(pm2.meta_key, 2)
+				FROM $wpdb->postmeta as pm2
+				WHERE  pm2.post_id = %d
+				AND pm2.meta_value = '%s')
+				AND pm1.post_id = %d",
+				$post_id , $array['key'], $post_id));
+
+			$original_fields = $dt_original_fields;
+			}  elseif(acf_is_array($value)){
+
+				$this->array_loop($post_id, $value);
+			}
+
+		}
+
+		$table_name = $wpdb->prefix."postmeta" ;
+		foreach ($original_fields as $field) {
+
+			$field_name = $field->meta_key;
+			$new_post_id = $post_id;
+			$image_id = get_post_meta( $new_post_id, $field_name );
+
+
+			$original_media_id = $image_id[0];
+
+			$meta_key = 'dt_original_media_id';
+			if ($original_media_id>=1){
 				$args = array(
-					'post_type'      => 'attachment',
-					'post_status'    => 'inherit',
-					'order'          => 'DESC',
-					'posts_per_page' => 1,
-					'meta_query'     => array(
-						array(
-							'key'     => $meta_key,
-							'value'   => $original_media_id,
-							'compare' => '=',
+						'post_type'      => 'attachment',
+						'post_status'    => 'inherit',
+						'order'          => 'DESC',
+						'posts_per_page' => 1,
+						'meta_query'     => array(
+							array(
+								'key'     => $meta_key,
+								'value'   => $original_media_id,
+								'compare' => '=',
+							)
 						)
-					)
-				);
+					);
 				$query = new WP_Query($args);
 				$acf_image_id = $query->posts[0]->ID;
 
 				if ($acf_image_id && get_post( $acf_image_id ) ) {
 
 					if ( wp_get_attachment_image( $acf_image_id, 'thumbnail' ) ) {
+
 						update_post_meta( $new_post_id, $field_name, $acf_image_id, $original_media_id );
-					} else { }
+					} else {
+						// Do something.
+					}
 				}
 			}
+
 		}
 	}
 
-	return false;
-}
+	// Rewrite this function name
+	function array_loop2($array, $post_id, $deep=FALSE){
+		global $wpdb;
 
+		foreach ($array as $key => $value) {
 
+			if(acf_is_array($value)){
 
-function pull_acf_image( $new_post_id, $args, $post_array ) {
+				$this->array_loop2($value, $post_id, TRUE);
 
-	$destination_blog_id = get_current_blog_id();
+			} elseif ( ($key=='type' || $key=='media_type') && $value=='image' && ($array['value']!='' || $array['url']!='')){
 
-	distribute_acf_image( $new_post_id, $original_post_id, $args, $destination_blog_id );
-}
-
-
-function set_acf_media ($boolean, $new_post_id, $media, $post_id, $args, $site){
-
-	$destination_blog_id = (is_numeric($site)) ? $site : $site->site->blog_id;
-
-	// Switch to origin to get id
-	restore_current_blog();
-	$origin_blog_id = get_current_blog_id();
-	$origin_blog_id = ($origin_blog_id===$destination_blog_id) ? $args->site->blog_id : $origin_blog_id;
-
-	switch_to_blog( $origin_blog_id );
-
-	$media = \Distributor\Utils\prepare_media( $post_id );
-
-
-	$fields = get_fields($post_id);
-
-	if ($fields) {
-		foreach( $fields as $key => $value ) {
-
-			$field_object = get_field_object( $key, $post_id);
-
-			foreach ($field_object as $key => $value) {
-				if (acf_is_array($value)) {
-					$media_acf = array_loop2($value, $post_id);
-				}
-			}
-
-			if( $field_object['type'] == 'image' || $field_object['media_type'] == 'image' ) {
-
-				$field_name = $field_object['value'];
-				if( $field_object['media_type'] == 'image' ) {
-					$field_name = $field_object['source_url'];
+				$field_name = ($array['value']!='') ? $array['value'] : $array['url'];
+				if( $array['media_type'] == 'image' ) {
+					$field_name = $array['source_url'];
 				}
 				if ($field_name!=''){
 					$destination_site_url = parse_url($field_name); // destination
-					$src_site_url = parse_url(get_site_url()); // main
+					$src_site_url         = parse_url(get_site_url()); // main
 
-					$field_name = str_replace($destination_site_url['host'], $src_site_url['host'], $field_name);
+					$field_name           = str_replace($destination_site_url['host'], $src_site_url['host'], $field_name);
 				}
-				$image_id = get_image_id($field_name);
 
-				$acf_image = \Distributor\Utils\format_media_post( get_post( $image_id ) );
-				$featured_image_id = get_post_thumbnail_id( $post_id );
-
+				$image_id              = $this->get_image_id($field_name);
+				$acf_image             = \Distributor\Utils\format_media_post( get_post( $image_id ) );
+				$featured_image_id     = get_post_thumbnail_id( $post_id );
 				$acf_image['featured'] = ($featured_image_id == $image_id) ? true : false;
-				$media[] = $acf_image;
+				$this->$acf_dt_media[]        = $acf_image;
 
 			}
+
+		}
+
+
+		if (!$deep){
+			return $this->$acf_dt_media;
 		}
 	}
 
-	$media = array_merge($media, $media_acf);
-	$media = unique_multidim_array($media,'id');
+	// Rewrite this function name.
+	function unique_multidim_array($array, $key) {
+		$temp_array = array();
+		$i = 0;
+		$key_array = array();
 
-	// Go back
-	switch_to_blog( $destination_blog_id );
-
-	\Distributor\Utils\set_media( $new_post_id, $media );
-}
-
-
-function pull_acf_media( $boolean, $new_post_id, $media, $original_post_id, $post_array, $site ) {
-
-	$destination_blog_id = get_current_blog_id();
-
-	set_acf_media( $boolean, $new_post_id, $media, $original_post_id, $site, $destination_blog_id );
-}
-
-function get_image_id($image_url) {
-	global $wpdb;
-
-	$attachment = $wpdb->get_col($wpdb->prepare("
-		SELECT ID FROM $wpdb->posts
-		WHERE guid='%s';",
-		$image_url ));
-
-	if($attachment){
-		return $attachment[0];
-	}
-}
-
-
-// Page Builder image search
-// Rewrite function name
-function array_loop($post_id, $array){
-	global $wpdb;
-
-	foreach ($array as $key => $value) {
-
-		if ($key=='type' && $value=='image'){
-
-		$dt_original_fields = $wpdb->get_results($wpdb->prepare("
-			SELECT meta_key
-			FROM $wpdb->postmeta as pm1
-			WHERE pm1.meta_key in (SELECT SUBSTRING(pm2.meta_key, 2)
-			FROM $wpdb->postmeta as pm2
-			WHERE  pm2.post_id = %d
-			AND pm2.meta_value = '%s')
-			AND pm1.post_id = %d",
-			$post_id , $array['key'], $post_id));
-
-		$original_fields = $dt_original_fields;
-		}  elseif(acf_is_array($value)){
-
-			array_loop($post_id, $value);
-		}
-
-	}
-
-	$table_name = $wpdb->prefix."postmeta" ;
-	foreach ($original_fields as $field) {
-
-		$field_name = $field->meta_key;
-		$new_post_id = $post_id;
-		$image_id = get_post_meta( $new_post_id, $field_name );
-
-
-		$original_media_id = $image_id[0];
-
-		$meta_key = 'dt_original_media_id';
-		if ($original_media_id>=1){
-			$args = array(
-					'post_type'      => 'attachment',
-					'post_status'    => 'inherit',
-					'order'          => 'DESC',
-					'posts_per_page' => 1,
-					'meta_query'     => array(
-						array(
-							'key'     => $meta_key,
-							'value'   => $original_media_id,
-							'compare' => '=',
-						)
-					)
-				);
-			$query = new WP_Query($args);
-			$acf_image_id = $query->posts[0]->ID;
-
-			if ($acf_image_id && get_post( $acf_image_id ) ) {
-
-				if ( wp_get_attachment_image( $acf_image_id, 'thumbnail' ) ) {
-
-					update_post_meta( $new_post_id, $field_name, $acf_image_id, $original_media_id );
-				} else {
-					// Do something.
-				}
+		foreach($array as $val) {
+			if (!in_array($val[$key], $key_array)) {
+				$key_array[$i] = $val[$key];
+				$temp_array[$i] = $val;
 			}
+			$i++;
 		}
-
-	}
-}
-
-
-$acf_dt_media = array();
-
-// Rewrite this function name
-function array_loop2($array, $post_id, $deep=FALSE){
-	global $wpdb, $acf_dt_media;
-
-	foreach ($array as $key => $value) {
-
-		if(acf_is_array($value)){
-
-			array_loop2($value, $post_id, TRUE);
-
-		} elseif ( ($key=='type' || $key=='media_type') && $value=='image' && ($array['value']!='' || $array['url']!='')){
-
-			$field_name = ($array['value']!='') ? $array['value'] : $array['url'];
-			if( $array['media_type'] == 'image' ) {
-				$field_name = $array['source_url'];
-			}
-			if ($field_name!=''){
-				$destination_site_url = parse_url($field_name); // destination
-				$src_site_url         = parse_url(get_site_url()); // main
-
-				$field_name           = str_replace($destination_site_url['host'], $src_site_url['host'], $field_name);
-			}
-
-			$image_id              = get_image_id($field_name);
-			$acf_image             = \Distributor\Utils\format_media_post( get_post( $image_id ) );
-			$featured_image_id     = get_post_thumbnail_id( $post_id );
-			$acf_image['featured'] = ($featured_image_id == $image_id) ? true : false;
-			$acf_dt_media[]        = $acf_image;
-
-		}
-
+		return $temp_array;
 	}
 
 
-	if (!$deep){
-		return $acf_dt_media;
-	}
-}
+} // End of class.
 
+new Distribute_ACF_Images;
 
-function unique_multidim_array($array, $key) {
-	$temp_array = array();
-	$i = 0;
-	$key_array = array();
-
-	foreach($array as $val) {
-		if (!in_array($val[$key], $key_array)) {
-			$key_array[$i] = $val[$key];
-			$temp_array[$i] = $val;
-		}
-		$i++;
-	}
-	return $temp_array;
-}
+endif; // End of class_exists() check.
