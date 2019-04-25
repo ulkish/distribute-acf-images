@@ -38,20 +38,19 @@ class Distribute_ACF_Images {
 	 *
 	 * @param  int $new_post_id      [description]
 	 * @param  int $original_post_id [description]
-	 * @param  array $args             Not used
-	 * @param  object $site             [description]
-	 * @return void
+	 * @param  array $args           Not used
+	 * @param  object $site          [description]
 	 */
 	function push_acf_image( $new_post_id, $original_post_id, $args, $site ) {
 		$destination_blog_id = (is_numeric($site)) ? $site : $site->site->blog_id;
 		// Switch to origin to get id
 		restore_current_blog();
-		$origin_blog_id = get_current_blog_id();
-		$origin_blog_id = ( $origin_blog_id === $destination_blog_id ) ? $args->site->blog_id : $origin_blog_id;
+		$origin_blog_id      = get_current_blog_id();
+		$origin_blog_id      = ( $origin_blog_id === $destination_blog_id ) ? $args->site->blog_id : $origin_blog_id;
 		// Go back
 		switch_to_blog( $destination_blog_id );
-		$post = get_post( $new_post_id );
-		$fields = get_fields( $post->ID );
+		$post                = get_post( $new_post_id );
+		$fields              = get_fields( $post->ID );
 
 		if ( $fields ) {
 
@@ -60,17 +59,18 @@ class Distribute_ACF_Images {
 				$field_object = get_field_object( $key, $post->ID );
 
 				foreach ( $field_object as $key => $value ) {
-
+					// If an image is found, ?
 					if ( $key == 'type' && $value == 'image' ){
-
+					// If an array is found, look for an image and place it $image_in_array
 					} elseif ( acf_is_array( $value ) ) {
 					   $field_name2 = $this->array_loop($post->ID, $value);
 					}
 				}
-
+				// If an image is found, ?
 				if( $field_object['type'] == 'image' ) {
-					$field_name = ( $field_object['_name'] != '' ) ? $field_object['_name'] : $field_name2;
-					$image_id = get_post_meta( $new_post_id, $field_name );
+					// If it's name is empty, ?
+					$field_name        = ( $field_object['_name'] != '' ) ? $field_object['_name'] : $field_name2;
+					$image_id          = get_post_meta( $new_post_id, $field_name );
 					$original_media_id = $image_id[0];
 
 					$meta_key = 'dt_original_media_id';
@@ -93,7 +93,11 @@ class Distribute_ACF_Images {
 					if ( $acf_image_id && get_post( $acf_image_id ) ) {
 
 						if ( wp_get_attachment_image( $acf_image_id, 'thumbnail' ) ) {
-							update_post_meta( $new_post_id, $field_name, $acf_image_id, $original_media_id );
+							update_post_meta(
+								$new_post_id,
+								$field_name,
+								$acf_image_id,
+								$original_media_id );
 						} else { }
 					}
 				}
@@ -110,39 +114,40 @@ class Distribute_ACF_Images {
 	 * @param  int $new_post_id [description]
 	 * @param  array $args        [description]
 	 * @param  array $post_array  [description]
-	 * @return void
 	 */
 	function pull_acf_image( $new_post_id, $args, $post_array ) {
 		$destination_blog_id = get_current_blog_id();
-		$this->push_acf_image( $new_post_id, $original_post_id, $args, $destination_blog_id );
+		$this->push_acf_image(
+			$new_post_id,
+			$original_post_id,
+			$args,
+			$destination_blog_id );
 	}
 
 	/**
 	 * [set_acf_media description]
 	 * @param boolean $boolean     [description]
-	 * @param int $new_post_id [description]
-	 * @param array $media       [description]
-	 * @param int $post_id     Original post id.
-	 * @param array $args        Not used.
-	 * @param object $site        [description]
+	 * @param int $new_post_id     [description]
+	 * @param array $media         [description]
+	 * @param int $post_id         Original post id.
+	 * @param array $args          Not used.
+	 * @param object $site         [description]
 	 */
 	function set_acf_media ( $boolean, $new_post_id, $media, $post_id, $args, $site ){
 
 		$destination_blog_id = ( is_numeric( $site ) ) ? $site : $site->site->blog_id;
 		// Switch to origin to get id
 		restore_current_blog();
-		$origin_blog_id = get_current_blog_id();
-		$origin_blog_id = ( $origin_blog_id === $destination_blog_id ) ? $args->site->blog_id : $origin_blog_id;
+		$origin_blog_id      = get_current_blog_id();
+		$origin_blog_id      = ( $origin_blog_id === $destination_blog_id ) ? $args->site->blog_id : $origin_blog_id;
 		// Go back.
 		switch_to_blog( $origin_blog_id );
-		$media = \Distributor\Utils\prepare_media( $post_id );
-		$fields = get_fields( $post_id );
+		$media               = \Distributor\Utils\prepare_media( $post_id );
+		$fields              = get_fields( $post_id );
 
 		if ( $fields ) {
 			foreach( $fields as $key => $value ) {
-
 				$field_object = get_field_object( $key, $post_id );
-
 				foreach ( $field_object as $key => $value ) {
 					if ( acf_is_array( $value ) ) {
 						$media_acf = $this->array_loop2( $value, $post_id );
@@ -155,14 +160,17 @@ class Distribute_ACF_Images {
 					}
 					if ( $field_name != '' ) {
 						$destination_site_url = parse_url($field_name); // destination
-						$src_site_url = parse_url(get_site_url()); // main
-						$field_name = str_replace($destination_site_url['host'], $src_site_url['host'], $field_name);
+						$src_site_url         = parse_url(get_site_url()); // main
+						$field_name           = str_replace(
+							$destination_site_url['host'],
+							$src_site_url['host'],
+							$field_name);
 					}
-					$image_id = $this->get_image_id($field_name);
-					$acf_image = \Distributor\Utils\format_media_post( get_post( $image_id ) );
-					$featured_image_id = get_post_thumbnail_id( $post_id );
+					$image_id              = $this->get_image_id($field_name);
+					$acf_image             = \Distributor\Utils\format_media_post( get_post( $image_id ) );
+					$featured_image_id     = get_post_thumbnail_id( $post_id );
 					$acf_image['featured'] = ( $featured_image_id == $image_id ) ? true : false;
-					$media[] = $acf_image;
+					$media[]               = $acf_image;
 				}
 			}
 		}
@@ -187,11 +195,16 @@ class Distribute_ACF_Images {
 	 */
 	function pull_acf_media( $boolean, $new_post_id, $media, $original_post_id, $post_array, $site ) {
 		$destination_blog_id = get_current_blog_id();
-		$this->set_acf_media( $boolean, $new_post_id, $media, $original_post_id, $site, $destination_blog_id );
+		$this->set_acf_media( $boolean,
+			$new_post_id,
+			$media,
+			$original_post_id,
+			$site,
+			$destination_blog_id );
 	}
 
 	/**
-	 * Get image id by searching by its 'guid'.
+	 * Gets image ids by searching by its 'guid'.
 	 *
 	 * @param  int $image_url
 	 * @return int            Image ID
@@ -211,10 +224,10 @@ class Distribute_ACF_Images {
 
 
 	/**
-	 * Page Builder image search
+	 * Page Builder image search.
 	 *
-	 * @param  int $post_id Original post id
-	 * @param  array $array   [description]
+	 * @param  int $post_id   Post ID
+	 * @param  array $array   Metavalue of an ACF field.
 	 * @return void
 	 */
 	function array_loop( $post_id, $array ){
@@ -241,11 +254,11 @@ class Distribute_ACF_Images {
 		}
 		foreach ( $original_fields as $field ) {
 
-			$field_name = $field->meta_key;
-			$new_post_id = $post_id;
-			$image_id = get_post_meta( $new_post_id, $field_name );
+			$field_name        = $field->meta_key;
+			$new_post_id       = $post_id;
+			$image_id          = get_post_meta( $new_post_id, $field_name );
 			$original_media_id = $image_id[0];
-			$meta_key = 'dt_original_media_id';
+			$meta_key          = 'dt_original_media_id';
 
 			if ($original_media_id >= 1 ) {
 				$args = array(
@@ -261,13 +274,17 @@ class Distribute_ACF_Images {
 							)
 						)
 					);
-				$query = new WP_Query( $args );
+				$query        = new WP_Query( $args );
 				$acf_image_id = $query->posts[0]->ID;
 
 				if ( $acf_image_id && get_post( $acf_image_id ) ) {
 
 					if ( wp_get_attachment_image( $acf_image_id, 'thumbnail' ) ) {
-						update_post_meta( $new_post_id, $field_name, $acf_image_id, $original_media_id );
+						update_post_meta(
+							$new_post_id,
+							$field_name,
+							$acf_image_id,
+							$original_media_id );
 					} else {
 						// Do something.
 					}
@@ -300,7 +317,10 @@ class Distribute_ACF_Images {
 					$destination_site_url = parse_url( $field_name ); // destination
 					$src_site_url         = parse_url( get_site_url() ); // main
 
-					$field_name           = str_replace( $destination_site_url['host'], $src_site_url['host'], $field_name );
+					$field_name           = str_replace(
+						$destination_site_url['host'],
+						$src_site_url['host'],
+						$field_name );
 				}
 
 				$image_id              = $this->get_image_id( $field_name );
@@ -325,12 +345,12 @@ class Distribute_ACF_Images {
 	 */
 	function unique_multidim_array( $array, $key ) {
 		$temp_array = array();
-		$i = 0;
-		$key_array = array();
+		$i          = 0;
+		$key_array  = array();
 
 		foreach( $array as $val ) {
 			if ( ! in_array( $val[$key], $key_array ) ) {
-				$key_array[$i] = $val[$key];
+				$key_array[$i]  = $val[$key];
 				$temp_array[$i] = $val;
 			}
 			$i++;
