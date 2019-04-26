@@ -36,10 +36,10 @@ class Distribute_ACF_Images {
 	/**
 	 * Main function. Expand
 	 *
-	 * @param  int $new_post_id      [description]
-	 * @param  int $original_post_id [description]
-	 * @param  array $args           Not used
-	 * @param  object $site          [description]
+	 * @param  int $new_post_id      The newly created post ID.
+	 * @param  int $original_post_id The original post ID.
+	 * @param  array $args           Not used (The arguments passed into wp_insert_post.)
+	 * @param  object $site          The distributor connection being pulled from.
 	 */
 	function push_acf_image( $new_post_id, $original_post_id, $args, $site ) {
 		$destination_blog_id = (is_numeric($site)) ? $site : $site->site->blog_id;
@@ -61,15 +61,14 @@ class Distribute_ACF_Images {
 				foreach ( $field_object as $key => $value ) {
 					// If an image is found, ?
 					if ( $key == 'type' && $value == 'image' ){
-					// If an array is found, look for an image and place it $image_in_array
+					// If an array is found, look for an image and place it in $image_name
 					} elseif ( acf_is_array( $value ) ) {
-					   $field_name2 = $this->array_loop($post->ID, $value);
+					   $image_name = $this->array_loop($post->ID, $value);
 					}
 				}
-				// If an image is found, ?
 				if( $field_object['type'] == 'image' ) {
-					// If it's name is empty, ?
-					$field_name        = ( $field_object['_name'] != '' ) ? $field_object['_name'] : $field_name2;
+					// If an image name hasn't been found, grab it from the array search
+					$field_name        = ( $field_object['_name'] != '' ) ? $field_object['_name'] : $image_name;
 					$image_id          = get_post_meta( $new_post_id, $field_name );
 					$original_media_id = $image_id[0];
 
@@ -91,7 +90,7 @@ class Distribute_ACF_Images {
 					$acf_image_id = $query->posts[0]->ID;
 
 					if ( $acf_image_id && get_post( $acf_image_id ) ) {
-
+						// Update the new post with the correct image location
 						if ( wp_get_attachment_image( $acf_image_id, 'thumbnail' ) ) {
 							update_post_meta(
 								$new_post_id,
@@ -111,9 +110,9 @@ class Distribute_ACF_Images {
 	/**
 	 * Using push_acf_image for pulling.
 	 *
-	 * @param  int $new_post_id [description]
-	 * @param  array $args        [description]
-	 * @param  array $post_array  [description]
+	 * @param  int   $new_post_id Newly created post
+	 * @param  array $args        Not used (The arguments passed into wp_insert_post.)
+	 * @param  array $post_array
 	 */
 	function pull_acf_image( $new_post_id, $args, $post_array ) {
 		$destination_blog_id = get_current_blog_id();
@@ -121,20 +120,21 @@ class Distribute_ACF_Images {
 			$new_post_id,
 			$original_post_id,
 			$args,
-			$destination_blog_id );
+			$destination_blog_id
+		);
 	}
 
 	/**
-	 * [set_acf_media description]
-	 * @param boolean $boolean     [description]
-	 * @param int $new_post_id     [description]
-	 * @param array $media         [description]
+	 * Given an array of media, set the media to a new post.
+	 *
+	 * @param boolean $boolean     Not used. (If Distributor should set the post media)
+	 * @param int $new_post_id     Newly created post
+	 * @param array $media         List of media items attached to the post, formatted by {@see \Distributor\Utils\prepare_media()}.
 	 * @param int $post_id         Original post id.
-	 * @param array $args          Not used.
-	 * @param object $site         [description]
+	 * @param array $args          Not used (The arguments passed into wp_insert_post.)
+	 * @param object $site         The distributor connection being pulled from.
 	 */
 	function set_acf_media ( $boolean, $new_post_id, $media, $post_id, $args, $site ){
-
 		$destination_blog_id = ( is_numeric( $site ) ) ? $site : $site->site->blog_id;
 		// Switch to origin to get id
 		restore_current_blog();
@@ -185,13 +185,12 @@ class Distribute_ACF_Images {
 	/**
 	 * Using set_acf_media to pull media
 	 *
-	 * @param  boolean $boolean          [description]
-	 * @param  int $new_post_id      [description]
-	 * @param  array $media            [description]
-	 * @param  int $original_post_id [description]
-	 * @param  array $post_array       [description]
-	 * @param  object $site             [description]
-	 * @return void
+	 * @param  boolean $boolean      Not used. (If Distributor should set the post media)
+	 * @param  int $new_post_id      Newly created post
+	 * @param  array $media          List of media items attached to the post, formatted by {@see \Distributor\Utils\prepare_media()}.
+	 * @param  int $original_post_id Original post id.
+	 * @param  array $post_array     The arguments passed into wp_insert_post.
+	 * @param  object $site          The distributor connection being pulled from.
 	 */
 	function pull_acf_media( $boolean, $new_post_id, $media, $original_post_id, $post_array, $site ) {
 		$destination_blog_id = get_current_blog_id();
@@ -207,7 +206,7 @@ class Distribute_ACF_Images {
 	 * Gets image ids by searching by its 'guid'.
 	 *
 	 * @param  int $image_url
-	 * @return int            Image ID
+	 * @return int $attachment[0] The image id.
 	 */
 	function get_image_id( $image_url ) {
 		global $wpdb;
