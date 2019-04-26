@@ -63,7 +63,7 @@ class Distribute_ACF_Images {
 					if ( $key == 'type' && $value == 'image' ){
 					// If an array is found, look for an image and place it in $image_name
 					} elseif ( acf_is_array( $value ) ) {
-					   $image_name = $this->array_loop($post->ID, $value);
+					   $image_name = $this->find_img_in_array($post->ID, $value);
 					}
 				}
 				if( $field_object['type'] == 'image' ) {
@@ -229,7 +229,7 @@ class Distribute_ACF_Images {
 	 * @param  array $array   Metavalue of an ACF field.
 	 * @return void
 	 */
-	function array_loop( $post_id, $array ){
+	function find_img_in_array( $post_id, $array ){
 		global $wpdb;
 
 		foreach ( $array as $key => $value ) {
@@ -248,7 +248,7 @@ class Distribute_ACF_Images {
 
 			$original_fields = $dt_original_fields;
 			}  elseif( acf_is_array( $value ) ){
-				$this->array_loop( $post_id, $value );
+				$this->find_img_in_array( $post_id, $value );
 			}
 		}
 		foreach ( $original_fields as $field ) {
@@ -293,17 +293,18 @@ class Distribute_ACF_Images {
 	}
 
 	/**
-	 * [array_loop2 description]
+	 * What is this loop for? Is it getting media as a whole?
+	 *
 	 * @param  array  $array   [description]
 	 * @param  int  $post_id [description]
-	 * @param  boolean $deep    [description]
-	 * @return void
+	 * @param  boolean $deep    What does DEEP mean?
+	 * @return array $acf_dt_media
 	 */
 	function array_loop2( $array, $post_id, $deep = FALSE ) {
 		global $wpdb;
 
 		foreach ( $array as $key => $value ) {
-
+			// If it's an array search deeper.
 			if ( acf_is_array( $value ) ) {
 				$this->array_loop2( $value, $post_id, TRUE );
 			} elseif ( ($key=='type' || $key=='media_type') && $value=='image' && ($array['value']!='' || $array['url']!='')){
@@ -327,7 +328,6 @@ class Distribute_ACF_Images {
 				$featured_image_id     = get_post_thumbnail_id( $post_id );
 				$acf_image['featured'] = ( $featured_image_id == $image_id ) ? true : false;
 				$this->$acf_dt_media[] = $acf_image;
-
 			}
 		}
 
@@ -337,10 +337,12 @@ class Distribute_ACF_Images {
 	}
 
 	/**
-	 * [unique_multidim_array description]
+	 * No idea what this one's doing, maybe checking if
+	 * the key is unique?
+	 *
 	 * @param  array $array [description]
 	 * @param  string $key   [description]
-	 * @return void
+	 * @return array $temp_array
 	 */
 	function unique_multidim_array( $array, $key ) {
 		$temp_array = array();
