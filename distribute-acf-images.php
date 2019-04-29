@@ -20,7 +20,7 @@ if( ! class_exists( 'Distribute_ACF_Images' ) ) :
 
 class Distribute_ACF_Images {
 
-	var $acf_dt_media = array();
+
 
 	/**
 	 * Add actions
@@ -153,24 +153,28 @@ class Distribute_ACF_Images {
 						$media_acf = $this->find_dt_media_id( $value, $post_id );
 					}
 				}
-				if( $field_object['type'] == 'image' || $field_object['media_type'] == 'image' ) {
-					$field_name = $field_object['value'];
-					if( $field_object['media_type'] == 'image' ) {
+				if( ($field_object['type'] == 'image') || ((isset($field_object['media_type'])) && $field_object['media_type'] == 'image') ) {
+					if ($field_object['value']) {
+						$field_name = $field_object['value'];
+					}
+					if( isset($field_object['media_type']) && $field_object['media_type'] == 'image' ) {
 						$field_name = $field_object['source_url'];
 					}
-					if ( $field_name != '' ) {
-						$destination_site_url = parse_url($field_name); // destination
-						$src_site_url         = parse_url(get_site_url()); // main
+					if ( isset( $field_name ) ) {
+						$destination_site_url = parse_url( $field_name ); // destination
+						$src_site_url         = parse_url( get_site_url() ); // main
 						$field_name           = str_replace(
 							$destination_site_url['host'],
 							$src_site_url['host'],
 							$field_name);
+						$image_id = $this->get_image_id( $field_name );
 					}
-					$image_id              = $this->get_image_id($field_name);
-					$acf_image             = \Distributor\Utils\format_media_post( get_post( $image_id ) );
-					$featured_image_id     = get_post_thumbnail_id( $post_id );
-					$acf_image['featured'] = ( $featured_image_id == $image_id ) ? true : false;
-					$media[]               = $acf_image;
+					if ( isset( $image_id ) ) {
+						$acf_image             = \Distributor\Utils\format_media_post( get_post( $image_id ) );
+						$featured_image_id     = get_post_thumbnail_id( $post_id );
+						$acf_image['featured'] = ( $featured_image_id == $image_id ) ? true : false;
+						$media[]               = $acf_image;
+					}
 				}
 			}
 		}
@@ -301,18 +305,21 @@ class Distribute_ACF_Images {
 	 */
 	function find_dt_media_id( $array, $post_id, $found = FALSE ) {
 		global $wpdb;
+		$acf_dt_media = array();
 
 		foreach ( $array as $key => $value ) {
 			// If it's an array search deeper.
 			if ( acf_is_array( $value ) ) {
 				$this->find_dt_media_id( $value, $post_id, TRUE );
-			} elseif ( ($key=='type' || $key=='media_type') && $value=='image' && ($array['value']!='' || $array['url']!='')){
+			} elseif ( ( (isset($key) && $key=='type') || (isset($key) && $key=='media_type'))
+				&& ((isset($value)) && $value=='image')
+				&& (isset($array['value']) || isset($array['url']))){
 
-				$field_name = ( $array['value'] != '' ) ? $array['value'] : $array['url'];
-				if ( $array['media_type'] == 'image' ) {
+				$field_name = ( isset($array['value']) ) ? $array['value'] : $array['url'];
+				if ( (isset($field_object['media_type'])) && $array['media_type'] == 'image' ) {
 					$field_name = $array['source_url'];
 				}
-				if ( $field_name != '' ) {
+				if ( isset($field_name) ) {
 					$destination_site_url = parse_url( $field_name ); // destination
 					$src_site_url         = parse_url( get_site_url() ); // main
 
@@ -326,12 +333,12 @@ class Distribute_ACF_Images {
 				$acf_image             = \Distributor\Utils\format_media_post( get_post( $image_id ) );
 				$featured_image_id     = get_post_thumbnail_id( $post_id );
 				$acf_image['featured'] = ( $featured_image_id == $image_id ) ? true : false;
-				$this->$acf_dt_media[] = $acf_image;
+				$acf_dt_media[] = $acf_image;
 			}
 		}
 
 		if ( ! $found ) {
-			return $this->$acf_dt_media;
+			return $acf_dt_media;
 		}
 	}
 
