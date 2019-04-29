@@ -34,7 +34,7 @@ class Distribute_ACF_Images {
 
 
 	/**
-	 * Main function. Expand
+	 * Main function. Updates new posts to contain the correct image ID.
 	 *
 	 * @param  int $new_post_id      The newly created post ID.
 	 * @param  int $original_post_id The original post ID.
@@ -112,7 +112,7 @@ class Distribute_ACF_Images {
 	 *
 	 * @param  int   $new_post_id Newly created post
 	 * @param  array $args        Not used (The arguments passed into wp_insert_post.)
-	 * @param  array $post_array
+	 * @param  array $post_array  (Not used)
 	 */
 	function pull_acf_image( $new_post_id, $args, $post_array ) {
 		$destination_blog_id = get_current_blog_id();
@@ -150,7 +150,7 @@ class Distribute_ACF_Images {
 				$field_object = get_field_object( $key, $post_id );
 				foreach ( $field_object as $key => $value ) {
 					if ( acf_is_array( $value ) ) {
-						$media_acf = $this->array_loop2( $value, $post_id );
+						$media_acf = $this->find_dt_media_id( $value, $post_id );
 					}
 				}
 				if( $field_object['type'] == 'image' || $field_object['media_type'] == 'image' ) {
@@ -176,7 +176,7 @@ class Distribute_ACF_Images {
 		}
 
 		$media = array_merge( $media, $media_acf );
-		$media = $this->unique_multidim_array( $media,'id' );
+		$media = $this->remove_duplicates_in_array( $media,'id' );
 		// Go back
 		switch_to_blog( $destination_blog_id );
 		\Distributor\Utils\set_media( $new_post_id, $media );
@@ -205,7 +205,7 @@ class Distribute_ACF_Images {
 	/**
 	 * Gets image ids by searching by its 'guid'.
 	 *
-	 * @param  int $image_url
+	 * @param  int $image_url     The guid used to query the db.
 	 * @return int $attachment[0] The image id.
 	 */
 	function get_image_id( $image_url ) {
@@ -227,7 +227,6 @@ class Distribute_ACF_Images {
 	 *
 	 * @param  int $post_id   Post ID
 	 * @param  array $array   Metavalue of an ACF field.
-	 * @return void
 	 */
 	function find_img_in_array( $post_id, $array ){
 		global $wpdb;
@@ -293,20 +292,20 @@ class Distribute_ACF_Images {
 	}
 
 	/**
-	 * What is this loop for? Is it getting media as a whole?
+	 *	Finds correct image ID
 	 *
-	 * @param  array  $array   [description]
-	 * @param  int  $post_id [description]
-	 * @param  boolean $deep    What does DEEP mean?
+	 * @param  array  $array    An array if meta field names
+	 * @param  int $post_id     Original post id.
+	 * @param  boolean $found   Image has been found.
 	 * @return array $acf_dt_media
 	 */
-	function array_loop2( $array, $post_id, $deep = FALSE ) {
+	function find_dt_media_id( $array, $post_id, $found = FALSE ) {
 		global $wpdb;
 
 		foreach ( $array as $key => $value ) {
 			// If it's an array search deeper.
 			if ( acf_is_array( $value ) ) {
-				$this->array_loop2( $value, $post_id, TRUE );
+				$this->find_dt_media_id( $value, $post_id, TRUE );
 			} elseif ( ($key=='type' || $key=='media_type') && $value=='image' && ($array['value']!='' || $array['url']!='')){
 
 				$field_name = ( $array['value'] != '' ) ? $array['value'] : $array['url'];
@@ -331,20 +330,20 @@ class Distribute_ACF_Images {
 			}
 		}
 
-		if ( ! $deep ) {
+		if ( ! $found ) {
 			return $this->$acf_dt_media;
 		}
 	}
 
 	/**
-	 * No idea what this one's doing, maybe checking if
-	 * the key is unique?
+	 * Removes duplicate values from a multi-dimensional array.
 	 *
-	 * @param  array $array [description]
-	 * @param  string $key   [description]
-	 * @return array $temp_array
+	 *
+	 * @param  array $array  Array containing duplicates.
+	 * @param  string $key   Field name.
+	 * @return array $temp_array Cleaned array.
 	 */
-	function unique_multidim_array( $array, $key ) {
+	function remove_duplicates_in_array( $array, $key ) {
 		$temp_array = array();
 		$i          = 0;
 		$key_array  = array();
