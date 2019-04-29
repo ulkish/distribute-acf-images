@@ -1,7 +1,7 @@
 === Distribute ACF Images ===
 
 Contributors: hugomoran
-Donate link: http://example.com/
+Donate link:
 Tags: distributor, acf, acf pro, advanced custom fields, images
 Requires at least: 3.0.1
 Requires PHP: 5.2.4
@@ -24,14 +24,9 @@ even for images nested inside a number of fields.
 
 == Frequently Asked Questions ==
 
-= A question that someone might have =
+= Does this plugin work for PDF files? =
 
-An answer to that question.
-
-= What about foo bar? =
-
-Answer to foo bar dilemma.
-
+No. At the moment this only works with image files.
 
 == Changelog ==
 
