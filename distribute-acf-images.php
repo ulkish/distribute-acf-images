@@ -20,7 +20,7 @@ if( ! class_exists( 'Distribute_ACF_Images' ) ) :
 
 class Distribute_ACF_Images {
 
-
+	var $acf_dt_media = array();
 
 	/**
 	 * Add actions
@@ -117,7 +117,7 @@ class Distribute_ACF_Images {
 	function pull_acf_image( $new_post_id, $args, $post_array ) {
 		$destination_blog_id = get_current_blog_id();
 
-		if ( (isset( $new_post_id ) && isset( $destination_blog_id ) ) ) {
+		if ( (isset( $new_post_id ) && isset( $destination_blog_id ) && isset( $original_post_id ) ) ) {
 			$this->push_acf_image(
 				$new_post_id,
 				$original_post_id,
@@ -309,8 +309,7 @@ class Distribute_ACF_Images {
 	 * @return array $acf_dt_media
 	 */
 	function find_dt_media_id( $array, $post_id, $found = FALSE ) {
-		global $wpdb;
-		$acf_dt_media = array();
+		global $wpdb, $acf_dt_media;
 
 		foreach ( $array as $key => $value ) {
 			// If it's an array search deeper.
