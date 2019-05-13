@@ -242,17 +242,35 @@ class Distribute_ACF_Images {
 
 			if ( $key == 'type' && $value == 'image' ){
 
-			$dt_original_fields = $wpdb->get_results( $wpdb->prepare("
-				SELECT meta_key
-				FROM $wpdb->postmeta as pm1
-				WHERE pm1.meta_key in (SELECT SUBSTRING(pm2.meta_key, 2)
-				FROM $wpdb->postmeta as pm2
-				WHERE  pm2.post_id = %d
-				AND pm2.meta_value = '%s')
-				AND pm1.post_id = %d",
-				$post_id , $array['key'], $post_id ) );
 
-			$original_fields = $dt_original_fields;
+				$dt_original_fields = $wpdb->get_results( $wpdb->prepare("
+					SELECT meta_key
+					FROM $wpdb->postmeta as pm1
+					WHERE pm1.meta_key in (
+						SELECT SUBSTRING(pm2.meta_key, 2)
+						FROM $wpdb->postmeta as pm2
+						WHERE  pm2.post_id = %d
+						AND pm2.meta_value = '%s'
+						)
+					AND pm1.post_id = %d",
+					$post_id , $array['key'], $post_id ) );
+
+
+
+					// Get keys from a post with {id}
+					// Check if {value}
+					// Return the meta_keys
+					// $post_meta_keys = get_post_meta( $post_id );
+					// foreach ( $post_meta_keys as $key => $value) {
+					// 	$tmp_value = subtr($key, 2);
+
+					// 	if ( $tmp_value === $array['key'] ) {
+					// 		$dt_original_fields = $array['key'];
+					// 	}
+					// }
+
+				// print_r( $dt_original_fields );
+				$original_fields = $dt_original_fields;
 			}  elseif( acf_is_array( $value ) ){
 				$this->find_img_in_array( $post_id, $value );
 			}
